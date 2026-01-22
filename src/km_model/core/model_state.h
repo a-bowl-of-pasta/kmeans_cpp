@@ -1,78 +1,41 @@
-/*
-    model_state holds the current state of the algorithm
-    it has all the key data and passes it around 
-*/
-#ifndef MODEL_STATE
-#define MODEL_STATE
+#ifndef MDL
+#define MDL
 
-#include "../clusters.h"
+#include <vector>
+#include "../cluster.h"
 
-template <class T>
-struct model_state
+struct Model_State
 {
+    // ===========  model configurations
     int total_runs; 
-    double convergence; 
+    double convergence_threshold; 
     int k_value; 
     int max_iterations; 
    
+    // =========== per-run tracking | may change per run
     int current_run; 
     int best_run_indx; 
-    double best_run_iter_sse; 
-    double best_chi_score; 
-    double best_shiloette; 
-    double best_jaccard_score; 
-    double best_rand_indx_score;
+    double best_run_sse; 
+
+    // =========== final evaluation metrics
+    double calinski_harabasz_score; 
+    double silhouette_score; 
+    double jaccard_score; 
+    double rand_indx_score;
     
-    std::vector<dataPoint<T>> data_set;  
-    std::vector<T> maxDataVector; 
-    std::vector<T> minDataVector; 
-    std::vector<clust<T>> cluster_list; 
-    std::vector<clust<T>> best_run_clust; 
-    std::vector<int> target_clusters; 
+    // =========== data set & ground truth
+    std::vector<Data_Point> data_set;  
+    std::vector<int> ground_truth_labels; 
+ 
+    // =========== clusters
+    std::vector<Cluster> best_run_clust;
+    std::vector<Cluster> cluster_list;
 
-    // ========================  basic update methods
-    
-    // - - - - incriment current run
-    void currentRun_increase()
-        {current_run ++;}
+    // =========== utility | used in some calculations 
+    std::vector<double> max_data_vector; 
+    std::vector<double> min_data_vector; 
 
-    // - - - - updates the best run
-    void updateBestRun()
-    {
-        best_run_clust = cluster_list; 
-    }
 
-    // - - - - checks if 'best_chi' should be replaced
-    void checkBetterChi(double potential_Chi)
-    {   
-        if(potential_Chi > best_chi_score)
-            best_chi_score = potential_Chi; 
-
-    }
-    
-    // - - - - checks if 'best_shiloette' should be replaced
-    void checkBetterShil(double potential_shiloette)
-    {
-        if(potential_shiloette > best_shiloette)
-            best_shiloette = potential_shiloette; 
-    }
-
-    // - - - - chekcs if 'best_jaccard_indx' should be replaced
-    void checkBetterJaccard(double potential_jacc)
-    {
-        if(potential_jacc > best_jaccard_score)
-            { best_jaccard_score = potential_jacc; }
-    }
-
-    // - - - - check if 'best_rand_indx_score' should be repalced
-    void checkBetterRandIndx(double potential_rand_indx)
-    {
-        if(potential_rand_indx > best_rand_indx_score)
-            { best_rand_indx_score = potential_rand_indx; }
-
-    }
-
-    // ======================== other useful methods
 
     // - - - - - - validates and assigns the main values for the constructor 
     void validateData(int k, int iter, double converg, int runs)
@@ -89,24 +52,29 @@ struct model_state
 
         k_value = k; 
         max_iterations = iter; 
-        convergence = converg;
+        convergence_threshold = converg;
         total_runs = runs; 
     }
    
-    model_state(int k_val, int total_runs, int max_iter, double converg)
+    Model_State(int k_val, int total_runs, int max_iter, double converg)
     {
         validateData(k_val, max_iter, converg, total_runs);
         
         current_run = 0; 
         best_run_indx = 0; 
-        best_run_iter_sse = std::numeric_limits<double>::max(); 
-        best_chi_score = std::numeric_limits<double>::min(); 
-        best_shiloette = std::numeric_limits<double>::min(); 
+        best_run_sse = std::numeric_limits<double>::max(); 
+        
+        calinski_harabasz_score= std::numeric_limits<double>::min(); 
+        silhouette_score = std::numeric_limits<double>::min(); 
+        jaccard_score = std::numeric_limits<double>::min();
+        rand_indx_score = std::numeric_limits<double>::min();
 
-        data_set = std::vector<dataPoint<T>>{};   
-        target_clusters = std::vector<int>{}; 
-        cluster_list = std::vector<clust<T>>{};
-        best_run_clust = std::vector<clust<T>>{};
+        data_set = std::vector<Data_Point>{};   
+        ground_truth_labels = std::vector<int>{}; 
+        cluster_list = std::vector<Cluster>{};
+        best_run_clust = std::vector<Cluster>{};
+        max_data_vector = std::vector<double>{};
+        min_data_vector = std::vector<double>{};
 
 
         cluster_list.reserve(k_val);
@@ -114,7 +82,35 @@ struct model_state
 
     }
 
-};
+    Model_State()
+    {
+        int k = 3; 
+        int max_iter = 100; 
+        double conv = .001; 
+        int runs = 10; 
 
+        validateData(k, max_iter, conv, runs);
+        
+        current_run = 0; 
+        best_run_indx = 0; 
+        best_run_sse = std::numeric_limits<double>::max(); 
+        
+        calinski_harabasz_score = std::numeric_limits<double>::min(); 
+        silhouette_score = std::numeric_limits<double>::min(); 
+        jaccard_score = std::numeric_limits<double>::min();
+        rand_indx_score = std::numeric_limits<double>::min();
+
+        data_set = std::vector<Data_Point>{};   
+        ground_truth_labels = std::vector<int>{}; 
+        cluster_list = std::vector<Cluster>{};
+        best_run_clust = std::vector<Cluster>{};
+        max_data_vector = std::vector<double>{};
+        min_data_vector = std::vector<double>{};
+
+
+        cluster_list.reserve(k);
+        best_run_clust.reserve(k);
+    }
+};
 
 #endif

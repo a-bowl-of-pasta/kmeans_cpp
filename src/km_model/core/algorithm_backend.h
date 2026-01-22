@@ -1,30 +1,27 @@
-/*
-    the h_backend class holds the backend logic for the k_means class
-    it is for methods that performs calculations and data processing
-    
-*/
-#ifndef ALG_BACKND
-#define ALG_BACKND
 
-#include "model_state.h"
-#include "../clusters.h"
+#ifndef ALG_BKND
+#define ALG_BKND    
 
-template <class T>
-class algorithm_backend
+#include <string>
+#include <sstream>
+#include <iostream>
+#include <fstream>
+#include <random>
+#include <vector>
+#include "../cluster.h"
+#include "./model_state.h"
+
+class Alg_Backend
 {
 
-    std::vector<dataPoint<T>>& data_set;
-    std::vector<int>& target_values;   
-    std::vector<T>& max_data_vector; 
-    std::vector<T>& min_data_vector; 
-    std::vector<clust<T>>& cluster_list; 
-
-    void createDataSetNode(const std::string& line, int& id, bool& firstRun)
+    void create_dataSet_node(const std::string& line, int& id, bool& firstRun, Model_State& state)
     {           
         // read rows element by element
         std::istringstream lineStream(line);
         std::string features; 
         std::vector<double> featureVector_temp;
+        std::vector<double>& max_data_vector = state.max_data_vector; 
+        std::vector<double>& min_data_vector = state.min_data_vector; 
 
         int currFeature =0; 
         while(getline(lineStream, features, ' '))
@@ -62,11 +59,12 @@ class algorithm_backend
         // ---- skip empty vectors  
         if (!featureVector_temp.empty())
         {
-            int targetValue = (int) featureVector_temp.pop_back();
+            int targetValue = (int) featureVector_temp.at(featureVector_temp.size() - 1);
+            featureVector_temp.pop_back(); 
 
             std::string point_ID_temp = "dataPoint " + std::to_string(id); 
-            data_set.push_back(dataPoint<T>(featureVector_temp, point_ID_temp));
-            target_values.push_back(targetValue); 
+            state.data_set.push_back(Data_Point(featureVector_temp, point_ID_temp));
+            state.ground_truth_labels.push_back(targetValue); 
             id++; 
 
         }              
@@ -74,18 +72,17 @@ class algorithm_backend
         if(firstRun == true) {firstRun = false; }
 
     }
-    
-    
-    bool checkUnique(int currClustIndx, int randCentroidIndx)
+ 
+    bool check_unique(int currClustIndx, int randCentroidIndx, Model_State& state)
     {
-        const std::string& dataPointID = data_set.at(randCentroidIndx).getDataID(); 
+        const std::string& dataPointID = state.data_set.at(randCentroidIndx).getPointID(); 
         bool unique = true; 
 
         for(int i = 0; i < currClustIndx; i++)
         {
-            dataPoint<T>& prevCentroids = cluster_list.at(i).getCentroid_ref(); 
+            Data_Point& prevCentroids = state.cluster_list.at(i).getCentroid_ref(); 
                  
-            if(dataPointID == prevCentroids.getDataID())
+            if(dataPointID == prevCentroids.getPointID())
             {
                 unique = false; 
                 break; 
@@ -95,20 +92,20 @@ class algorithm_backend
         return unique; 
     }
    
-    // - - - - - - gets me the mean vector for the whole dataSet
-    std::vector<T> meanFeatureVector_dataSet()
+    // - - - - - - gets a mean feature vector using the whole dataset
+    std::vector<double> mean_feature_vector_datasetLevel(Model_State& state)
     {
-        dataPoint<T>& temp = data_set.at(0); 
+        Data_Point& temp = state.data_set.at(0); 
         int featureDimensions = temp.getFeatureDimensions(); 
     
         std::vector<double> meanFeatureVector(featureDimensions, 0.0); 
     
-        int sizeOfData = data_set.size();  
+        int sizeOfData = state.data_set.size();  
 
         // ------ go through each data vector
         for(int currFeatureVector = 0; currFeatureVector < sizeOfData; currFeatureVector++)
         {
-            std::vector<T>& featVector_temp = data_set.at(currFeatureVector).getFeatureVector_ref(); 
+            std::vector<double>& featVector_temp = state.data_set.at(currFeatureVector).getFeatureVector_ref(); 
             
             // -------- calculate the sum of each feature
            for(int feature = 0; feature < featVector_temp.size(); feature++  )
@@ -130,13 +127,12 @@ class algorithm_backend
 
     }
 
+
     public: 
-
-    // ==================================================== distance calculations
-
+    
     //  - - - - - - - - Finds the euclidean distance of two points (x1, x2)
     //&                 (X1_0 - X2_0)^2 + (X1_1 - X2_1)^2 + ..... + (X1_n - X2_n)^2
-    double sqr_euclid_dist(std::vector<T>& x1_feature_vector, std::vector<T>& x2_feature_vector)
+    double sqr_euclid_dist(std::vector<double>& x1_feature_vector, std::vector<double>& x2_feature_vector)
     {
         double finalDistance = 0.0; 
            
@@ -144,8 +140,8 @@ class algorithm_backend
         for(int i =0; i < x1_feature_vector.size(); i++)
         {
             // get the features out of the vector 
-            T x2_feature = x2_feature_vector.at(i); 
-            T x1_feature = x1_feature_vector.at(i); 
+            double x2_feature = x2_feature_vector.at(i); 
+            double x1_feature = x1_feature_vector.at(i); 
 
             // residual = x1 - x2 
             double curr_sqr_residual = x1_feature - x2_feature; 
@@ -160,130 +156,81 @@ class algorithm_backend
         return finalDistance; 
     }    
 
-    // - - - - - - finds regular euclidean distance
-    //&            sqrt( (X1_0 - X2_0)^2 + (X1_1 - X2_1)^2 + ..... + (X1_n - X2_n)^2 )
-    double euclidean_distance(std::vector<T>& x1_feature_vector, std::vector<T&> x2_feature_vector)
-    {
-        double temp = sqr_euclid_dist(x1_feature_vector, x2_feature_vector);
-        return sqrt(temp); 
-    }
-
-    // - - - - - - - finds the manhattan distance of two points (x1, x2)
-    //&              |X1_0 - X2_0| + |X1_1 - X2_1| + ..... + |X1_n - X2_n|
-    double manhattan_distance(std::vector<T>& x1_feature_vector, std::vector<T>& x2_feature_vector)
-    {
-        double finalDistance = 0.0; 
-           
-        // - - - - loop through x2 features 
-        for(int i =0; i < x1_feature_vector.size(); i++)
-        {
-            // get the features out of the vector 
-            T x2_feature = x2_feature_vector.at(i); 
-            T x1_feature = x1_feature_vector.at(i); 
-
-            // residual = |x1 - x2|
-            double curr_abs_residual = std::abs(x1_feature - x2_feature); 
-        
-            // finalDist = sum( all residuals )
-            finalDistance += curr_abs_residual; 
-        }
-
-        return finalDistance; 
-    }    
-
-
-    // ============================================ processing 
-
     // - - - - - - -  -  assign data from  data_set to cluster 
-    void initClust(int k_value) 
+    void init_clust(Model_State& state) 
     {
         int currentPoint = 0;
 
         // ----- loops through data set to find closest centroid per dataPoint
         //       Clust saves the dataPoint index from  data_set, not the dataPoint itself
-        while(currentPoint < data_set.size())
+        while(currentPoint < state.data_set.size())
         {
             int bestFitIndex_temp = 0; 
             double currBestFit_temp = std::numeric_limits<double>::max();    
 
             // - - - finds distance between each centroid and point
-            for(int i = 0; i < k_value; i ++)
+            for(int i = 0; i < state.k_value; i ++)
             {
-                dataPoint<T>& currCentroid_temp = cluster_list.at(i).getCentroid_ref();
-                double distFromCent_temp = sqr_euclid_dist(data_set.at(currentPoint), currCentroid_temp);
+                Data_Point& currCentroid_temp = state.cluster_list.at(i).getCentroid_ref();
+                Data_Point& currPoint = state.data_set.at(currentPoint); 
+                double distFromCent_temp = sqr_euclid_dist(currPoint.getFeatureVector_ref(), currCentroid_temp.getFeatureVector_ref());
                 
                 if(distFromCent_temp < currBestFit_temp )
                 {
                     bestFitIndex_temp = i; 
+                    currBestFit_temp = distFromCent_temp;
                 }
                
             }
 
-            cluster_list.at(bestFitIndex_temp).assignData(currentPoint); 
+            state.cluster_list.at(bestFitIndex_temp).assignData(currentPoint); 
             currentPoint++; 
         } 
         
     }    
 
-
-    // - - - - finds the iteration SSE
-    double calcIterationSSE(int k_value)
+    // - - - - random data point init
+    void init_forging(Model_State& state)
     {
-        double totalIterationSSE = 0.0;
-        for(int i =0; i < k_value; i++)
-        {
-            cluster_list.at(i).sumSquaredError(data_set); 
-            totalIterationSSE += cluster_list.at(i).getClassLevelSSE(); 
-        }
-        return totalIterationSSE; 
-    }
-   
+        int currentCluster = 0; 
 
-    // - - - - - - CH = (SSB / (k - 1)) / (SSW / (n - k))
-    double genCHI(double runSSE, int k_value)
-    {
+        // ---- better random numbers
+        std::random_device rand_seed; 
+        std::mt19937 PRNG(rand_seed());
+        std::uniform_int_distribution<int> numRange(0, state.data_set.size() -1); 
         
-        double SSB_value = 0.0; 
-        std::vector<T> meanDataVec =  meanFeatureVector_dataSet(); 
-        for(int i = 0; i < k_value; i++)
+        // -------- runs until all K clusters have centroids
+        while (currentCluster < state.k_value)
         {
-            clust<T>& currClust = cluster_list.at(i); 
-            dataPoint<T> currCent = currClust.getCentroid(); 
+            int centroidIndx = numRange(PRNG); 
 
-            // gets the squared euclidean distance | (centroid - meanVec)^2
-            double pt1 = currCent.calcSquaredEuclidDist(meanDataVec); 
-
-            SSB_value += currClust.getSize() * pt1; 
+            // ---- first cluster, no need to compare
+            if(currentCluster == 0)
+            {
+                Cluster& currClust = state.cluster_list.at(currentCluster);                 
+                currClust.setCentroid(state.data_set.at(centroidIndx)); 
+                currentCluster++; 
+            }
+            else // ---- compare with other clusters, no repeated centroids 
+            {               
+                // ---- assign centroid if unique
+                if(check_unique( currentCluster, centroidIndx, state))
+                {
+                    Cluster& currClust = state.cluster_list.at(currentCluster); 
+                    currClust.setCentroid(state.data_set.at(centroidIndx));  
+                    currentCluster++;
+                }
+            }
         }
 
-        double pt1 = SSB_value / (k_value - 1); 
-        double pt2 = runSSE / (data_set.size() - k_value); 
-
-        return pt1 / pt2; 
+        init_clust(state); 
     }
-
-
-    // - - - - - - - the total Silhouette score for the current run
-    double genShiloetteScore(int k_value)
-    {
-        double individualClustSScore = 0.0 ;
-
-        for(int i = 0; i < k_value; i++)
-        {    
-            clust<T>& currClust = cluster_list.at(i); 
-            
-            individualClustSScore += currClust.silhouette_score(data_set, cluster_list);
-            
-        }
-        return (individualClustSScore / k_value); 
-    }
-
 
     // - - - - - - reads input file, 
-    void loadDataSet( const std::string&  data_file)
+    void load_dataSet( const std::string&  dataFilePath, Model_State& state)
     {
         std::string line; 
-        std::ifstream fn(data_file); 
+        std::ifstream fn(dataFilePath); 
         bool isFirstLine = true; 
         int id = 0; 
         bool firstRun = true; 
@@ -292,7 +239,7 @@ class algorithm_backend
         if(!fn.is_open())
         {
             std::cout << "ERROR :: file is not opening"<<std::endl; 
-            std::cout << "INFO  :: file path = " << data_file <<std::endl; 
+            std::cout << "INFO  :: file path = " << dataFilePath <<std::endl; 
             exit(EXIT_FAILURE);
         }
 
@@ -302,7 +249,7 @@ class algorithm_backend
             // ---- first line = header, following lines = data 
             if(isFirstLine == false)
             {
-               createDataSetNode( line, id, firstRun); 
+               create_dataSet_node( line, id, firstRun, state); 
             }
             else 
             {
@@ -312,48 +259,51 @@ class algorithm_backend
         }
        
         fn.close(); 
+
     }
 
-    // - - - - random data point init
-    void init_forging(int k_value)
+    // - - - -  data normalization
+    void calc_normalized_data(Model_State& state)
     {
-        int currentCluster = 0; 
 
-        // ---- better random numbers
-        std::random_device rand_seed; 
-        std::mt19937 PRNG(rand_seed());
-        std::uniform_int_distribution<int> numRange(0, data_set.size() -1); 
-        
-        // -------- runs until all K clusters have centroids
-        while (currentCluster < k_value)
+        // ------ goes through each feature vector
+        for(int currFeatVectIndx =0; currFeatVectIndx < state.data_set.size(); currFeatVectIndx++)
         {
-            int centroidIndx = numRange(PRNG); 
-
-            // ---- first cluster, no need to compare
-            if(currentCluster == 0)
+            std::vector<double>& currFeatVect_temp = state.data_set.at(currFeatVectIndx).getFeatureVector_ref(); 
+            
+            // ----- goes through each elm in feature vector
+            for(int featureIndx = 0; featureIndx < currFeatVect_temp.size(); featureIndx++ )
             {
-                clust<T>& currClust = cluster_list.at(currentCluster);                 
-                currClust.setCentroid(data_set.at(centroidIndx)); 
-                currentCluster++; 
-            }
-            else // ---- compare with other clusters, no repeated centroids 
-            {               
-                // ---- assign centroid if unique
-                if(checkUnique( currentCluster, centroidIndx))
+                double currFeature_temp = currFeatVect_temp.at(featureIndx); 
+                double maxVal_temp = state.max_data_vector.at(featureIndx); 
+                double minVal_temp = state.min_data_vector.at(featureIndx); 
+                
+                // x' = x - min(x) / max(x) - min(x)
+                double normalizedFeature = 0.0; 
+                if((maxVal_temp - minVal_temp) != 0)
                 {
-                    clust<T>& currClust = cluster_list.at(currentCluster); 
-                    currClust.assignCentroid(data_set.at(centroidIndx));  
-                    currentCluster++;
+                    normalizedFeature = (currFeature_temp - minVal_temp) / (maxVal_temp - minVal_temp);
                 }
+
+                currFeatVect_temp.at(featureIndx) = normalizedFeature; 
             }
         }
-
-        initClust(k_value); 
     }
 
-
+    // - - - - finds the iteration SSE
+    double calc_iteration_SSE(Model_State& state)
+    {
+        double totalIterationSSE = 0.0;
+        for(int i =0; i < state.k_value; i++)
+        {
+            state.cluster_list.at(i).sum_squared_error(state.data_set); 
+            totalIterationSSE += state.cluster_list.at(i).getSSE_classLevel(); 
+        }
+        return totalIterationSSE; 
+    }
+   
     // - - - - creates a new node (dataPoint) for the dataSet vector | not used outside this class
-    bool checkConvergance(model_state<T>& current_state, std::vector<double>& iter_sse_vector, int current_iteration, double iterSSE)
+    bool check_convergance(Model_State& state, std::vector<double>& iter_sse_vector, int current_iteration, double iterSSE)
     {
         bool converged = false; 
         
@@ -365,112 +315,152 @@ class algorithm_backend
             double currentSSE = iter_sse_vector.at(current_iteration); 
             double convCheck = (prevSSE - currentSSE) / prevSSE;
 
-            if (convCheck < current_state.convergence)
+            if (convCheck < state.convergence_threshold)
             {
                 converged = true; 
             }
         }
         else 
         {
-            if(iterSSE < current_state.convergence) 
+            if(iterSSE < state.convergence_threshold) 
             {              
                 converged =  true; 
             }
         }
 
         // ---- if converged, compare current iteration to algorithm's best iteration
-        if(current_state.best_run_iter_sse > iterSSE && converged == true)
+        if(state.best_run_sse > iterSSE && converged == true)
         {
             // sets values for the current best 'run' 
-            current_state.best_run_iter_sse = iterSSE; 
-            current_state.best_run_indx = current_state.current_run; 
+            state.best_run_sse = iterSSE; 
+            state.best_run_indx = state.current_run; 
 
             // deep copy best run clusters
-            current_state.updateBestRun();
-            
+            state.best_run_clust = state.cluster_list;             
         } 
 
         return converged; 
     }
    
-
-    // - - - -  data normalization
-    void calcNormalizedData()
+    // - - - - - - CH = (SSB / (k - 1)) / (SSW / (n - k))
+    double gen_calinski_index(Model_State& state)
     {
-
-        // ------ goes through each feature vector
-        for(int currFeatVectIndx =0; currFeatVectIndx < data_set.size(); currFeatVectIndx++)
+        // between cluster sum of squares = SSB 
+        double between_cluster_sum_of_squares = 0.0; 
+        std::vector<double> meanDataVec =  mean_feature_vector_datasetLevel(state); 
+       
+        for(int i = 0; i < state.k_value; i++)
         {
-            std::vector<T>& currFeatVect_temp = data_set.at(currFeatVectIndx).getFeatureVector_ref(); 
-            
-            // ----- goes through each elm in feature vector
-            for(int featureIndx = 0; featureIndx < currFeatVect_temp.size(); featureIndx++ )
-            {
-                double currFeature_temp = currFeatVect_temp.at(featureIndx); 
-                double maxVal_temp = max_data_vector.at(featureIndx); 
-                double minVal_temp = min_data_vector.at(featureIndx); 
-                
-                // x' = x - min(x) / max(x) - min(x)
-                double normalizedFeature = 0.0; 
-                if((maxVal_temp - minVal_temp) != 0)
-                {
-                    normalizedFeature = (currFeature_temp - minVal_temp) / (maxVal_temp - minVal_temp);
-                }
+            Cluster& currClust = state.cluster_list.at(i); 
+            Data_Point& currCent = currClust.getCentroid_ref(); 
 
-                currFeatVect_temp.at(featureIndx) = normalizedFeature; 
-            }
-            data_set.at(currFeatVectIndx).setFeatureVector(currFeatVect_temp);
+            // gets the squared euclidean distance | (centroid - meanVec)^2
+            double pt1 = sqr_euclid_dist(currCent.getFeatureVector_ref(), meanDataVec); 
+
+            between_cluster_sum_of_squares += currClust.cluster_size() * pt1; 
         }
+
+        double pt1 = between_cluster_sum_of_squares / (state.k_value - 1); 
+        double pt2 = state.best_run_sse / (state.data_set.size() - state.k_value); 
+
+        return pt1 / pt2; 
     }
 
-    // - - - - random partition init
-    void init_randomPartition(int k_value)
+    // - - - - - - silhouette score 
+    double gen_silhouette_score(Model_State& state)
     {
-        // picks random cluster form cluster list
-        std::random_device rand_seed;
-        std::mt19937 PRNG(rand_seed());
-        std::uniform_int_distribution range(0, k_value-1);
+        double currentClustSilhouette = 0.0 ;
+
+        for(int i = 0; i < state.k_value; i++)
+        {    
+            Cluster& currClust = state.cluster_list.at(i); 
+            
+            currentClustSilhouette += currClust.silhouette_score(state.data_set, state.cluster_list);
+            
+        }
+        return (currentClustSilhouette / state.k_value); 
+
+    }
+
+    // - - - - - calculates Rand Index between two partitions | good for balanced datasets - no disproportionate FN,FP,TP,TN
+    //&          (truePositives + trueNegatives) / total pairs
+    void gen_rand_index_score(Model_State& state, std::vector<int>& datasetLabels)
+    {
+        int totalPoints = datasetLabels.size();
+        int truePositives = 0;  // same final clust in preditction & ground truth
+        int trueNegatives = 0;  // different final clust in preditction & ground truth
         
-        // ---- assign data to rand clust
-        for(int i = 0 ; i < data_set.size(); i++)
+        // ------ compare all pairs
+        for(int x1 = 0; x1 < totalPoints; x1++)
         {
-            int randNum = range(PRNG);
-            
-            cluster_list.at(randNum).assignData(i);
-        }   
+            for(int x2 = x1 + 1; x2 < totalPoints; x2++)
+            {
+                bool sameInPrediction = (datasetLabels[x1] == datasetLabels[x2]);
+                bool sameInGroundTruth = (state.ground_truth_labels[x1] == state.ground_truth_labels[x2]);
+                
+                // correctly predicted two points in the same cluster
+                if(sameInGroundTruth && sameInPrediction)
+                    { truePositives++;}
 
-        // ---- find mean featVec for each clust then assign as centroid
-        for(int k = 0; k < k_value; k++)
+                // correctly predicted two points in different clusters
+                else if(!sameInGroundTruth && !sameInPrediction)
+                    { trueNegatives++; }
+            }
+        }
+        
+        int totalPairs = (totalPoints * (totalPoints - 1)) / 2;
+        double finalScore = (double)((truePositives + trueNegatives) / totalPairs);
+
+        std::cout << "I AM IN THE GEN_RAND_INDEX_SCORE METHOD :: THE FINAL SCORE IS :: " << finalScore << std::endl; 
+
+        state.rand_indx_score = finalScore;
+    }
+
+    // - - - - - calculates Jaccard Index between two partitions | good for disproportionate datasets - far more TN than the rest
+    //&          true positives / (true positives + false negative + false positives)
+    void gen_jaccard_index_score(Model_State& state, std::vector<int>& datasetLabels)
+    {
+        int totalPoints = datasetLabels.size();
+        int truePositives = 0;  // same final clust in preditction & ground truth
+        int falsePositives = 0;  // same final clust in preditction but different in ground truth
+        int flaseNegatives = 0;  // different final clust in preditction but same in  ground truth
+        
+        // ------ compare all pairs
+        for(int x1 = 0; x1 < totalPoints; x1++)
         {
+            for(int x2 = x1 + 1; x2 < totalPoints; x2++)
+            {
+                bool sameInPrediction = (datasetLabels[x1] == datasetLabels[x2]);
+                bool sameInGroundTruth = (state.ground_truth_labels[x1] == state.ground_truth_labels[x2]);
+                
+                // correctly predicted two points in same cluster
+                if(sameInPrediction && sameInGroundTruth)
+                    { truePositives++; }
 
-            std::vector<T> meanData_temp = cluster_list.at(k).genMeanFeatVector(data_set);  
-            
-            std::string id_temp = "Mean Centroid " + std::to_string(k); 
-            dataPoint<T> newPoint_temp(meanData_temp, 0.0, id_temp);
+                // incorrectly predected two points in the same cluster
+                else if(sameInPrediction && !sameInGroundTruth)
+                    { falsePositives++; }
 
-            clust_list.at(k).assignCentroid(newPoint_temp);
+                // 
+                else if(!sameInPrediction && sameInGroundTruth)
+                    { flaseNegatives++;}
+            }
         }
 
-        // reassign data based off of the initial centroid
-        initClust(k_value); 
+        // does not account for true negatives | more strict but better for disproportionate sets
+        //~ disproportinate where there may be 80 true positives but only 5 true negatives
+        int totalPairs = truePositives + falsePositives + flaseNegatives; 
+        double finalScore = (double)(truePositives / totalPairs); 
+        
+        std::cout << "I AM IN THE GEN_JACCARD_INDEX_SCORE METHOD :: THE FINAL SCORE IS :: " << finalScore << std::endl; 
+
+
+        state.jaccard_score = finalScore;
     }
 
 
-    algorithm_backend(model_state<T>& current_state)
-    : data_set(current_state.data_set), 
-      max_data_vector(current_state.maxDataVector), 
-      min_data_vector(current_state.minDataVector), 
-      cluster_list(current_state.cluster_list),
-      target_values(current_state.target_clusters)
-      {}
-
-    algorithm_backend()
-    : data_set(), 
-      max_data_vector(), 
-      min_data_vector(), 
-      cluster_list(),
-      target_values() 
-      {}
+    Alg_Backend()
+    {}
 };
 
 #endif

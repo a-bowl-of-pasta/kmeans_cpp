@@ -1,7 +1,29 @@
 
-#include "./km_model/km_driver.h"
+#include "./km_model/kmeans_driver.h"
 #include <vector>
 #include <iostream>
+
+
+struct model_config
+{
+
+    
+
+    int k_val = default_Kvals[indx_used];     // argv[2]
+    int iterations = 100;                    // argv[3]
+    double convergence = 0.001;             // argv[4]
+    int num_of_runs = 5;                 // argv[5] 
+
+
+
+    model_config(int k, int iter, double conv, int totalRuns)
+    {   
+        k_val = k; 
+        iterations = iter; 
+        convergence = conv; 
+        num_of_runs = totalRuns; 
+    }
+};
 
 // ================================ test with hard coded values
 void inlineRuns()
@@ -18,19 +40,10 @@ void inlineRuns()
     //std::string file_name = "testingMM";           
 
     // ===== arg variables 
-    int k_val = default_Kvals[indx_used];     // argv[2]
-    int iterations = 100;                    // argv[3]
-    double convergence = 0.001;             // argv[4]
-    int num_of_runs = 100;                 // argv[5] 
 
     // so that you can copy and paste :: default_files[indx_used]    file_name
     std::string path_in = "../uci_ml_datasets/with_ground_truth/" + default_files[indx_used] + ".txt";
     std::string path_out = "../outputs/"+ current_version_out +"/"+ default_files[indx_used] + "_out.txt";
-
-
-    k_means<double> km_manager(k_val, num_of_runs, iterations, convergence);
-        km_manager.runAlg(path_in, true); 
-    //  km_manager.runAndLogAlg(path_in, path_out, true); 
 
 }
 
@@ -57,12 +70,6 @@ void actualRun(int argc, char* argv[])
         exit(EXIT_FAILURE);        
     }
 
-    std::string path_in = "../data_sets/" + file_name + ".txt";
-
-   
-    k_means<double> km_manager(std::stoi(argv[5]), std::stod(argv[4]), std::stoi(argv[2]), std::stoi(argv[3]));
-    km_manager.runAlg(path_in, true); 
-
 
 }
 
@@ -71,26 +78,7 @@ void actualRun(int argc, char* argv[])
 int main(int argc, char* argv[])
 {
 
-    // ---- run using args
-    //actualRun(argc, argv);
-    
-    // ---- test using hard coded values 
     inlineRuns(); 
 
 return 0; 
 }
-
-/*
-    intended interactions 
-    user
-    |
-    | - - - k_means
-            |
-            | - - - km_dat
-            | - - - h_io   
-            | - - - h_backend
-                    | - - - DataPoint
-                    | - - - Clust
-                            |
-                            | - - - DataPoint 
-*/
