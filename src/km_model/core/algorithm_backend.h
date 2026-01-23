@@ -408,10 +408,8 @@ class Alg_Backend
             }
         }
         
-        int totalPairs = (totalPoints * (totalPoints - 1)) / 2;
+        double totalPairs = (double)(totalPoints * (totalPoints - 1)) / 2;
         double finalScore = (double)((truePositives + trueNegatives) / totalPairs);
-
-        std::cout << "I AM IN THE GEN_RAND_INDEX_SCORE METHOD :: THE FINAL SCORE IS :: " << finalScore << std::endl; 
 
         state.rand_indx_score = finalScore;
     }
@@ -449,11 +447,8 @@ class Alg_Backend
 
         // does not account for true negatives | more strict but better for disproportionate sets
         //~ disproportinate where there may be 80 true positives but only 5 true negatives
-        int totalPairs = truePositives + falsePositives + flaseNegatives; 
+        double totalPairs = (double) truePositives + falsePositives + flaseNegatives; 
         double finalScore = (double)(truePositives / totalPairs); 
-        
-        std::cout << "I AM IN THE GEN_JACCARD_INDEX_SCORE METHOD :: THE FINAL SCORE IS :: " << finalScore << std::endl; 
-
 
         state.jaccard_score = finalScore;
     }

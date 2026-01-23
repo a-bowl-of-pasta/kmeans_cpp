@@ -7,13 +7,10 @@
 struct model_config
 {
 
-    
-
-    int k_val = default_Kvals[indx_used];     // argv[2]
-    int iterations = 100;                    // argv[3]
-    double convergence = 0.001;             // argv[4]
-    int num_of_runs = 5;                 // argv[5] 
-
+    int k_val;     // argv[2]
+    int iterations;                    // argv[3]
+    double convergence;             // argv[4]
+    int num_of_runs;                 // argv[5] 
 
 
     model_config(int k, int iter, double conv, int totalRuns)
@@ -21,64 +18,60 @@ struct model_config
         k_val = k; 
         iterations = iter; 
         convergence = conv; 
-        num_of_runs = totalRuns; 
+        num_of_runs = totalRuns;    
     }
+    
 };
 
-// ================================ test with hard coded values
-void inlineRuns()
+
+
+void run_inline() 
 {
-
-    // hard coded file names for argv[1]
-    int indx_used = 3; 
-    std::string current_version_out = "v8.0_outputs";
-
-    std::string default_files[] = {"ecoli", "glass", "ionosphere", "iris_bezdek", "landsat", "letter_recognition", "segmentation", "vehicle", "wine", "yeast"}; 
-    int default_Kvals[] = {8,6,2,3,6,26,7,4,3,10};
+    // get dataset file location & init model configs 
+    int file_array_index = 4; 
+    std::string current_version_output = "v9.0_outputs"; 
     
-    // manually typing file name for argv[1]
-    //std::string file_name = "testingMM";           
+    std::string default_files[10] = {"ecoli", "glass", "ionosphere", "iris_bezdek", "landsat", "letter_recognition", "segmentation", "vehicle", "wine", "yeast"}; 
+    int default_Kvals[10] = {8,6,2,3,6,26,7,4,3,10}; 
 
-    // ===== arg variables 
+    std::string path_in = "../uci_ml_datasets/with_ground_truth/" + default_files[file_array_index] + ".txt";
+    std::string path_out = "../benchmarks/"+ current_version_output +"/"+ default_files[file_array_index] + "_out.txt";
 
-    // so that you can copy and paste :: default_files[indx_used]    file_name
-    std::string path_in = "../uci_ml_datasets/with_ground_truth/" + default_files[indx_used] + ".txt";
-    std::string path_out = "../outputs/"+ current_version_out +"/"+ default_files[indx_used] + "_out.txt";
+    model_config configs(default_Kvals[file_array_index], 100, .001, 100); 
 
+    // build model
+    km_driver test_model(configs.k_val, configs.num_of_runs, configs.iterations, configs.convergence);
+    test_model.build_model(path_in, true, false); 
+
+    // peek dataset data
+    std::cout << "\npress <enter> to view \"peek_model_data\" method" << std::endl; 
+    std::cin.get(); 
+    system("clear"); 
+
+    int num_of_dataset_lines_to_view = 10;
+    test_model.peek_model_data(num_of_dataset_lines_to_view);
+
+    // peek data assigned to clusters
+    std::cout << "\npress <enter> to view \"peek_cluster_data\" method" << std::endl; 
+    std::cin.get(); 
+    system("clear"); 
+
+
+    test_model.peek_cluster_data(configs.k_val);
+
+    // model evaluation summary  
+    std::cout << "\npress <enter> to view \"evaluation_summary\" method" << std::endl; 
+    std::cin.get();
+    system("clear"); 
+
+
+    test_model.evaluation_summary(); 
 }
-
-// =================================== run using args
-void actualRun(int argc, char* argv[])
-{
-     // ===== arg variables 
-    std::string file_name; //argv[1]
-    int k_val;            // argv[2]
-    int iterations;      // argv[3]
-    double convergence; // argv[4]
-    int num_of_runs;   // argv[5] 
-
-
-    // ======================= check that args are correct & create k_means API thingy
-    try
-    { 
-        file_name = argv[1]; 
-    }
-    catch(std::exception e)
-    {
-        std::cout << "ERROR :: invalid argument | file_Name should be <String>" << std::endl;
-        std::cout << "INFO  :: fileName = " << file_name << std::endl;  
-        exit(EXIT_FAILURE);        
-    }
-
-
-}
-
-
 // ============================= main 
 int main(int argc, char* argv[])
 {
 
-    inlineRuns(); 
+    run_inline(); 
 
-return 0; 
+    return 0; 
 }

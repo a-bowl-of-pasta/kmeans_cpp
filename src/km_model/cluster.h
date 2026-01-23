@@ -172,6 +172,7 @@ class Cluster
         return finalDistance; 
     }    
 
+
     // - - - - - - - - - - - - - -  - SSE calculation 
     void sum_squared_error( std::vector<Data_Point>& dataSet)
     {
@@ -262,6 +263,7 @@ class Cluster
         return allCohesionScores;
     }
 
+
     // - - - - - - separation using point to point, pairwise, strategy
     //&            b(i) = (currPoint - every_Other_Point_In_other_clusters)^2
     void separation_pairwise(std::vector<double>& b_i, std::vector<Data_Point>& dataset, std::vector<int>& clustB_data)
@@ -289,6 +291,7 @@ class Cluster
 
     }
 
+    
     // - - - - - - - final shilouette score 
     //&              s(i) = b(i) - a(i) / max(a(i), b(i))
     double silhouette_score(std::vector<Data_Point>& data_set, std::vector<Cluster>& clust_list)

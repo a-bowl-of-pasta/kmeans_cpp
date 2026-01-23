@@ -210,6 +210,7 @@ class km_io
             linesToPrint = state.data_set.size();   
         }
 
+        std::cout << "total existing data_points :: " << state.data_set.size() << " ... displaying " << linesToPrint << " points" << std::endl <<std::endl; 
         std::cout << "data features"<< std::setw(40) << std::right <<"target clusters" << std::endl; 
         std::cout << std::setfill('-') << std::setw(50)<< ""  << std::setfill(' ') 
                   << std::fixed <<  std::setprecision(4) << std::endl; 
@@ -346,10 +347,12 @@ class km_driver
 
 public: 
     
+    //~ =============================================== build model
     // - - - - - - builds the model to be used
     void build_model(std::string& filePath, bool normalize = false, bool printRuns =false)
     {
         set_model(filePath, normalize); 
+        model_output.console_output("Currently building model....");
 
         //& - - - - - - - - start of timer & main algorithm 
         auto start = std::chrono::high_resolution_clock::now();
@@ -365,11 +368,25 @@ public:
         //& - - - - - - - - end of timer and main algorithm 
 
         std::chrono::duration<double> seconds_taken = end - start;                
-        std::cout << "total time taken for algorithm :: " << seconds_taken.count() << "s" << std::endl;
+        std::cout << "total time taken to build model :: " << seconds_taken.count() << "s" << std::endl;
 
         current_state.cluster_list = current_state.best_run_clust; 
     }
 
+    //~ ============================================== peek data 
+    // - - - - - - displays data in dataset
+    void peek_model_data(int lineToView =0)
+    {
+        model_output.print_dataset(current_state, lineToView);
+    }
+
+    // - - - - - - displays data in assigned to cluster
+    void peek_cluster_data(int clustersToView =0)
+    {
+        model_output.print_cluster_data(current_state, clustersToView); 
+    }
+
+    //~ ======================================================= evaluations 
     // - - - - - - calculate and display the shilouette_score
     void shilouette_score()
     {
@@ -436,19 +453,6 @@ public:
         rand_index(); 
         jaccard_score(); 
     }
-
-    // - - - - - - displays data in dataset
-    void peek_model_data(int lineToView =0)
-    {
-        model_output.print_dataset(current_state, lineToView);
-    }
-
-    // - - - - - - displays data in assigned to cluster
-    void peek_cluster_data(int clustersToView =0)
-    {
-        model_output.print_cluster_data(current_state, clustersToView); 
-    }
-
 
     km_driver(int k_val, int total_runs, int max_iter, double converg)
     {
