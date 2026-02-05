@@ -10,8 +10,11 @@ a.out
 .vs/
 .idea/
 for_tony_important/
-usr_datasets/csv_datasets/
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# My personal test files
+penguins.csv
+wine-clustering.csv
