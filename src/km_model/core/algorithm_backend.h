@@ -8,13 +8,15 @@
 #include <fstream>
 #include <random>
 #include <vector>
+#include <unordered_map>
 #include "../cluster.h"
 #include "./model_state.h"
 
 class Alg_Backend
 {
 
-    void create_dataSet_node(const std::string& line, int& id, bool& firstRun, Model_State& state)
+    // - - - - - - creates the datapoint nodes that the dataset is made up of
+    void create_dataSet_node(const std::string& line, char delim, int& id, bool& firstRun, bool hasGroundTruth, Model_State& state)
     {           
         // read rows element by element
         std::istringstream lineStream(line);
@@ -23,21 +25,30 @@ class Alg_Backend
         std::vector<double>& max_data_vector = state.max_data_vector; 
         std::vector<double>& min_data_vector = state.min_data_vector; 
 
+
+
         int currFeature =0; 
-        while(getline(lineStream, features, ' '))
+        while(getline(lineStream, features, delim))
         {
+
             // ---- skip empty elements 
             if (!features.empty())
             {
                 double featToDec = std::stod(features); 
                
                 // ----- first run populates min/max vectors, other runs find min/max
-                if(firstRun == true)
+                if(firstRun == true) 
                 {
                     max_data_vector.push_back(featToDec);
                     min_data_vector.push_back(featToDec);
                 }
-                else
+                else if(max_data_vector.size() <= currFeature)
+                {
+                    max_data_vector.push_back(featToDec);
+                    min_data_vector.push_back(featToDec);
+ 
+                }
+                else 
                 {
                     // swap attributes if elm in vector is smaller
                     if(max_data_vector.at(currFeature) < featToDec)
@@ -50,6 +61,7 @@ class Alg_Backend
                     {
                         min_data_vector.at(currFeature) = featToDec; 
                     }
+
                 }
                 featureVector_temp.push_back(featToDec);
                 currFeature++; 
@@ -58,21 +70,162 @@ class Alg_Backend
 
         // ---- skip empty vectors  
         if (!featureVector_temp.empty())
-        {
-            int targetValue = (int) featureVector_temp.at(featureVector_temp.size() - 1);
-            featureVector_temp.pop_back(); 
+        {  
+            if(hasGroundTruth != false)
+            {             
+                int targetValue = (int) featureVector_temp.at(featureVector_temp.size() - 1);
+                featureVector_temp.pop_back(); 
+                state.ground_truth_labels.push_back(targetValue);
+            } 
 
             std::string point_ID_temp = "dataPoint " + std::to_string(id); 
             state.data_set.push_back(Data_Point(featureVector_temp, point_ID_temp));
-            state.ground_truth_labels.push_back(targetValue); 
             id++; 
-
         }              
         
         if(firstRun == true) {firstRun = false; }
 
     }
+           
+    // - - - - - - gets a mean feature vector using the whole dataset
+    std::vector<double> mean_feature_vector_datasetLevel(Model_State& state)
+    {
+        Data_Point& temp = state.data_set.at(0); 
+        int featureDimensions = temp.getFeatureDimensions(); 
+    
+        std::vector<int> dynamicFeatureTally; 
+        std::vector<double> meanFeatureVector; 
+    
+        int sizeOfData = state.data_set.size();  
+
+        // ------ go through each data vector
+        for(int currFeatureVector = 0; currFeatureVector < sizeOfData; currFeatureVector++)
+        {
+            std::vector<double>& currFeatureVector_temp = state.data_set.at(currFeatureVector).getFeatureVector_ref(); 
+            
+            // -------- calculate the sum of each feature
+           for(int feature = 0; feature < currFeatureVector_temp.size(); feature++  )
+            {
+                if(feature >= meanFeatureVector.size())
+                {
+                    meanFeatureVector.push_back(currFeatureVector_temp.at(feature));
+                    dynamicFeatureTally.push_back(1); 
+                }
+                else
+                {
+                    meanFeatureVector.at(feature) += currFeatureVector_temp.at(feature); 
+                    dynamicFeatureTally.at(feature) += 1; 
+                }
+            }
+
+        }
+        // ------- divide each feature's sum by total dataPoints
+        // ------- this creates a vector of means
+        for(int i =0; i < meanFeatureVector.size(); i++)
+        {
+            meanFeatureVector.at(i) = meanFeatureVector.at(i) / dynamicFeatureTally.at(i); 
+        }
+
+        // ---- return new centroid's dataVector
+        return meanFeatureVector; 
+
+    }
+    
+    // - - - - - -  find mode
+    int mode_dataset_dimension(Model_State& state)
+    {
+        int datasetSize = state.data_set.size(); 
+        
+        int modeDimension = 0;           // mode data dimensinos
+        int currModeFrequency = 0; 
+
+        std::unordered_map<int, int> dimension_frequency; 
+
+        // - - - sums feature length of all datapoints
+        for(int i = 0; i < datasetSize; i++)
+        {
+            int currPoint_dimension_temp = state.data_set.at(i).getFeatureDimensions(); 
+            
+            dimension_frequency[currPoint_dimension_temp]++; 
+
+            // adjust mode variables if needed 
+            if(currModeFrequency < dimension_frequency[currPoint_dimension_temp])
+            {
+                currModeFrequency = dimension_frequency[currPoint_dimension_temp]; 
+                modeDimension = currPoint_dimension_temp; 
+            }
+        }
+        
+        return modeDimension; 
+    }
+   
+   // - - - - - - adjusts large or small dimensions
+    void fit_dimensions(Model_State& state)
+    {        
+        int modeDimension = mode_dataset_dimension(state); 
+        std::vector<double> meanPerColumn = mean_feature_vector_datasetLevel(state); // used to pad
+
+        if(state.min_data_vector.size() > modeDimension)
+        {
+                int amt_to_cut =  state.min_data_vector.size() - modeDimension ; 
+
+                // - - - positions cut
+                for(int j = 0 ; j < amt_to_cut; j++)
+                {
+                    state.min_data_vector.pop_back(); 
+                    state.max_data_vector.pop_back(); 
+                }
+        }
+
+        if(meanPerColumn.size() > modeDimension)
+        {
+            int amt_to_cut =  meanPerColumn.size() - modeDimension ; 
+
+                // - - - positions cut
+                for(int j = 0 ; j < amt_to_cut; j++)
+                {
+                    meanPerColumn.pop_back(); 
+                }
+        }
+        // =============================================== trim / pad outliers
+        // fill pad/trim outliers
+        for(int i =0; i < state.data_set.size(); i++)
+        {
+            Data_Point& currPoint_temp = state.data_set.at(i);
+            std::vector<double>& currFeatureVector = currPoint_temp.getFeatureVector_ref(); 
  
+            // - pad with mean
+            if(currPoint_temp.getFeatureDimensions() < modeDimension) 
+            {
+                int amt_to_add =  modeDimension - currPoint_temp.getFeatureDimensions(); 
+
+                // - - - positions filled
+                for(int j = amt_to_add ; j > 0; j-- )
+                {
+                    double meanToAdd = meanPerColumn.at(modeDimension - j);                                                 
+                    currFeatureVector.push_back(meanToAdd); 
+                }
+
+                state.total_padded_dataPoints += amt_to_add; 
+            }
+            // - trim to size 
+            else if(currPoint_temp.getFeatureDimensions() > modeDimension)
+            {
+                int amt_to_cut = currPoint_temp.getFeatureDimensions() - modeDimension; 
+                
+                // - - - positions cut
+                for(int j = 0 ; j < amt_to_cut; j++)
+                {
+                    currFeatureVector.pop_back(); 
+                }
+                
+                state.total_trimmed_dataPoints += amt_to_cut; 
+            }
+        }
+
+    }
+
+    // - - - - - - verifies that centroids are unique 
     bool check_unique(int currClustIndx, int randCentroidIndx, Model_State& state)
     {
         const std::string& dataPointID = state.data_set.at(randCentroidIndx).getPointID(); 
@@ -92,44 +245,13 @@ class Alg_Backend
         return unique; 
     }
    
-    // - - - - - - gets a mean feature vector using the whole dataset
-    std::vector<double> mean_feature_vector_datasetLevel(Model_State& state)
-    {
-        Data_Point& temp = state.data_set.at(0); 
-        int featureDimensions = temp.getFeatureDimensions(); 
-    
-        std::vector<double> meanFeatureVector(featureDimensions, 0.0); 
-    
-        int sizeOfData = state.data_set.size();  
-
-        // ------ go through each data vector
-        for(int currFeatureVector = 0; currFeatureVector < sizeOfData; currFeatureVector++)
-        {
-            std::vector<double>& featVector_temp = state.data_set.at(currFeatureVector).getFeatureVector_ref(); 
-            
-            // -------- calculate the sum of each feature
-           for(int feature = 0; feature < featVector_temp.size(); feature++  )
-            {
-                meanFeatureVector.at(feature) += featVector_temp.at(feature); 
-            }
-
-        }
-
-        // ------- divide each feature's sum by total dataPoints
-        // ------- this creates a vector of means
-        for(int i =0; i < meanFeatureVector.size(); i++)
-        {
-            meanFeatureVector.at(i) = meanFeatureVector.at(i) / sizeOfData; 
-        }
-
-        // ---- return new centroid's dataVector
-        return meanFeatureVector; 
-
-    }
-
-
     public: 
     
+    // !!!!!!!!
+    // TODO[] add one hot encoding
+    // TODO[] switch padding strategy based on if encoded or not | encoded uses mode not uses mean
+    // TODO[] add to model_state a tally for | total data encoded, total data trimmed, total data padded
+    // !!!!!!!!
     //  - - - - - - - - Finds the euclidean distance of two points (x1, x2)
     //&                 (X1_0 - X2_0)^2 + (X1_1 - X2_1)^2 + ..... + (X1_n - X2_n)^2
     double sqr_euclid_dist(std::vector<double>& x1_feature_vector, std::vector<double>& x2_feature_vector)
@@ -227,13 +349,25 @@ class Alg_Backend
     }
 
     // - - - - - - reads input file, 
-    void load_dataSet( const std::string&  dataFilePath, Model_State& state)
+    void load_dataSet( const std::string&  dataFilePath, std::string fileType, bool hasGroundTruth, Model_State& state)
     {
         std::string line; 
         std::ifstream fn(dataFilePath); 
         bool isFirstLine = true; 
         int id = 0; 
         bool firstRun = true; 
+        char delim; 
+
+        if(fileType == "csv")
+        {
+            std::cout << "- file type : csv | separating by commas\n" << std::endl; 
+            delim = ','; 
+        }
+        else if(fileType == "txt")
+        {
+            std::cout << "- file type : txt | separating by empty space\n" << std::endl;        
+            delim = ' '; 
+        }
 
         // ---- check if file is open
         if(!fn.is_open())
@@ -249,7 +383,7 @@ class Alg_Backend
             // ---- first line = header, following lines = data 
             if(isFirstLine == false)
             {
-               create_dataSet_node( line, id, firstRun, state); 
+               create_dataSet_node(line, delim, id, firstRun, hasGroundTruth, state); 
             }
             else 
             {
@@ -260,6 +394,12 @@ class Alg_Backend
        
         fn.close(); 
 
+    }
+
+    // - - - - - - standardizes datapoint length to vectors of the same length 
+    void clean_data(Model_State& state)
+    {
+        fit_dimensions(state); 
     }
 
     // - - - -  data normalization

@@ -156,7 +156,7 @@ class km_io
         // --- prints min 1 cluster & max all clusters
         if(clustersToPeek <= 0)
         {
-            clustersToPeek = 1; 
+            clustersToPeek = state.k_value; 
         }
         else if(clustersToPeek > state.k_value)
         {
@@ -209,7 +209,6 @@ class km_io
         { 
             linesToPrint = state.data_set.size();   
         }
-
         std::cout << "total existing data_points :: " << state.data_set.size() << " ... displaying " << linesToPrint << " points" << std::endl <<std::endl; 
         std::cout << "data features"<< std::setw(40) << std::right <<"target clusters" << std::endl; 
         std::cout << std::setfill('-') << std::setw(50)<< ""  << std::setfill(' ') 
@@ -247,6 +246,27 @@ class km_driver
     Model_State current_state; 
     km_io model_output; 
     
+
+    // - - - - - - loads dataset 
+    void load_dataset(std::string& filePath, std::string fileType, bool normalize, bool hasGroundTruth, bool printRuns)
+    {
+        //& - - - - - - - - - - converts fileType to lower case if not already
+        std::string fType = "";
+        for(int i = 0; i < fileType.size(); i++)
+        {
+            fType += tolower(fileType.at(i)); 
+        } 
+
+        //& - - - - - - - - - - checks that file type is valid 
+        if(fType != "csv" && fType != "txt")
+        {
+            model_output.console_output("ERROR :: file type must be either \"csv\" or \"txt\" :: ERROR"); 
+            exit(EXIT_FAILURE); 
+        }
+        set_model(filePath, fType, hasGroundTruth, normalize);    
+        
+    }
+
     // - - - - - - finds and sets cluster's mean centroids
     void setNextCentroid()
     {
@@ -292,7 +312,7 @@ class km_driver
     }
     
     // - - - - - - - initially sets model & resets between runs
-    void set_model(std::string filePath="", bool normalize=false )
+    void set_model(std::string filePath="", std::string fileType="csv", bool hasGroundTruth=false,  bool normalize=false )
     {
             
             if(current_state.current_run == 0)
@@ -300,12 +320,18 @@ class km_driver
                 for(int i =0; i < current_state.k_value; i++)
                 {
                     Cluster clust_temp; 
-                    clust_temp.setID(i);  
+                    clust_temp.setID( i +1 );  
                     current_state.cluster_list.push_back(std::move(clust_temp));
                 }
 
-                backend.load_dataSet(filePath, current_state);
+                backend.load_dataSet(filePath, fileType, hasGroundTruth, current_state);         
+                   
+                // ----- clean dataset
+                model_output.console_output("cleaning dataset...");
+                backend.clean_data(current_state);
+
             }
+            
             //~ ------ initialization strategy goes here 
         
             backend.init_forging(current_state); 
@@ -349,13 +375,25 @@ public:
     
     //~ =============================================== build model
     // - - - - - - builds the model to be used
-    void build_model(std::string& filePath, bool normalize = false, bool printRuns =false)
+    void build_model(std::string& filePath, std::string fileType ="csv", bool normalize = false, bool hasGroundTruth = false, bool printRuns =false)
     {
-        set_model(filePath, normalize); 
-        model_output.console_output("Currently building model....");
+    
+        //& - - - - - - - - - load and clean dataset
+        auto startLoadAndCleanTime = std::chrono::high_resolution_clock::now();
+        model_output.console_output("Loading data set....");
 
-        //& - - - - - - - - start of timer & main algorithm 
-        auto start = std::chrono::high_resolution_clock::now();
+        load_dataset(filePath, fileType,normalize, hasGroundTruth, printRuns); 
+
+        auto endLoadAndCleanTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> timeToLoadAndClean = endLoadAndCleanTime - startLoadAndCleanTime; 
+        
+        model_output.console_output("\ntotal time taken to load and clean data set:: " + std::to_string(timeToLoadAndClean.count()) + "s\n");        
+        //& - - - - - - - - - 
+
+        //& - - - - - - - - build model 
+        model_output.console_output("Currently building model....");
+        
+        auto timeBuildModel = std::chrono::high_resolution_clock::now();
         while (current_state.current_run <= current_state.total_runs) // Current run starts at 1 end at total_runs
         {    
             start_run(printRuns);
@@ -364,11 +402,11 @@ public:
             
             current_state.current_run++; 
         } 
-        auto end = std::chrono::high_resolution_clock::now();
-        //& - - - - - - - - end of timer and main algorithm 
-
-        std::chrono::duration<double> seconds_taken = end - start;                
-        std::cout << "total time taken to build model :: " << seconds_taken.count() << "s" << std::endl;
+        auto stopModelTimer = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> modelBuildTime = stopModelTimer - timeBuildModel;                
+        
+        model_output.console_output("\ntotal time taken to build model :: " + std::to_string(modelBuildTime.count()) + "s");        
+        //& - - - - - - - -  
 
         current_state.cluster_list = current_state.best_run_clust; 
     }
@@ -439,11 +477,38 @@ public:
 
     }
 
-    // - - - - - - calculate and display the shilouette, chi, rand, and jaccard
-    void evaluation_summary()
+    // - - - - - - - moddified data breakdown
+    void modification_summary()
     {
+        int paddedData = current_state.total_padded_dataPoints; 
+        model_output.console_output("\n\ntotal data padded :: " + std::to_string(paddedData));
+
+        int trimmedData = current_state.total_trimmed_dataPoints; 
+        model_output.console_output("total data trimmed :: " + std::to_string(trimmedData ));
+
+        int hotEncodedData = current_state.total_encrypted_dataPoints; 
+        model_output.console_output("total data hot-encoded :: " + std::to_string(hotEncodedData));
+
+        int totalModdifiedData = paddedData + trimmedData + hotEncodedData; 
+        model_output.console_output("ntotal data modified :: " + std::to_string(totalModdifiedData));
+    }
+    // - - - - - - - calculates internal evaluation metrics : silhouette & calinski score
+    void internal_evaluation_summary()
+    {
+        modification_summary(); 
+
+        model_output.console_output("\n\nCluster quality evaluation metrics | internal evaluation metrics\n"); 
+        shilouette_score(); 
+        calinski_score(); 
+    }
+    
+    // - - - - - - calculate and display the shilouette, Calinski score, rand, and jaccard
+    void full_evaluation_summary()
+    {
+        modification_summary(); 
+
         // cluster quality metrics | how good are the clusters themselves
-        model_output.console_output("\n\nCluster quality evaluation metrics\n"); 
+        model_output.console_output("\n\nCluster quality evaluation metrics | internal evaluation metrics\n"); 
         shilouette_score(); 
         calinski_score(); 
 
@@ -466,4 +531,4 @@ public:
 
 
 
-#endif
+#endif 

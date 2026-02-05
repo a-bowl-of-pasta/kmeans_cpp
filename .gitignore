@@ -10,6 +10,7 @@ a.out
 .vs/
 .idea/
 for_tony_important/
+usr_datasets/csv_datasets/
 
 # OS files
 .DS_Store

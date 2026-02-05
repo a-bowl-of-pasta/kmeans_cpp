@@ -3,7 +3,7 @@
 
 #include <vector>
 #include "../cluster.h"
-
+ 
 struct Model_State
 {
     // ===========  model configurations
@@ -16,6 +16,10 @@ struct Model_State
     int current_run; 
     int best_run_indx; 
     double best_run_sse; 
+    int total_trimmed_dataPoints; 
+    int total_padded_dataPoints;
+    int total_encrypted_dataPoints; 
+
 
     // =========== final evaluation metrics
     double calinski_harabasz_score; 
@@ -68,6 +72,9 @@ struct Model_State
         silhouette_score = std::numeric_limits<double>::min(); 
         jaccard_score = std::numeric_limits<double>::min();
         rand_indx_score = std::numeric_limits<double>::min();
+        total_encrypted_dataPoints = 0; 
+        total_padded_dataPoints = 0; 
+        total_trimmed_dataPoints = 0; 
 
         data_set = std::vector<Data_Point>{};   
         ground_truth_labels = std::vector<int>{}; 
@@ -99,6 +106,9 @@ struct Model_State
         silhouette_score = std::numeric_limits<double>::min(); 
         jaccard_score = std::numeric_limits<double>::min();
         rand_indx_score = std::numeric_limits<double>::min();
+        total_encrypted_dataPoints = 0; 
+        total_padded_dataPoints = 0; 
+        total_trimmed_dataPoints = 0; 
 
         data_set = std::vector<Data_Point>{};   
         ground_truth_labels = std::vector<int>{}; 
