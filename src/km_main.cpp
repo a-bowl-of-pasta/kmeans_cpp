@@ -79,7 +79,7 @@ void usr_sandbox(std::string& file_type, int kval, int iterations, double thresh
 
     km_driver model(config.k_val, config.num_of_runs, config.iterations, config.convergence);
     
-    model.build_model(filePath, file_type, true); 
+    model.build_model(filePath, file_type, true, true);    
 
     model.internal_evaluation_summary(); 
  
@@ -89,15 +89,15 @@ void usr_sandbox(std::string& file_type, int kval, int iterations, double thresh
 int main(int argc, char* argv[])
 {
     // preview kmeans with already loaded datasets | test_kmeans takes int as param < 0 - 9 >
-    //test_kmeans(); 
+    test_kmeans(4); 
 
     // calls user sandbox code
-    
+    /*
     std::string file_type; 
     std::cout << "type dataset file type < csv | txt > default is csv :: "; 
     std::cin >> file_type; 
 
     usr_sandbox(file_type, 5, 100, .001, 100);
-     
+    */
     return 0; 
 }

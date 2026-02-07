@@ -247,11 +247,6 @@ class Alg_Backend
    
     public: 
     
-    // !!!!!!!!
-    // TODO[] add one hot encoding
-    // TODO[] switch padding strategy based on if encoded or not | encoded uses mode not uses mean
-    // TODO[] add to model_state a tally for | total data encoded, total data trimmed, total data padded
-    // !!!!!!!!
     //  - - - - - - - - Finds the euclidean distance of two points (x1, x2)
     //&                 (X1_0 - X2_0)^2 + (X1_1 - X2_1)^2 + ..... + (X1_n - X2_n)^2
     double sqr_euclid_dist(std::vector<double>& x1_feature_vector, std::vector<double>& x2_feature_vector)
