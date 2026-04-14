@@ -12,6 +12,23 @@
 #include <iomanip>
 #include <chrono>
 
+/*
+
+!!!!!!!!!!!!!!!!!!!!!!!!
+
+look through if-else conditions
+
+some of them for the evaluations are wrong.
+they do else if ( last condition >= score && score < ###) 
+instead of ( last condition <= score && score < ###) 
+
+!!!!!!!!!!!!!!!!!!!!!!!
+
+*/
+
+
+
+
 
 class km_io
 {
