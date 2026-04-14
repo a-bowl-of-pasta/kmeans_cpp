@@ -122,7 +122,7 @@ class km_io
             {
                 std::cout << "Silhouette Score ::  " << S_score << "\t| S-Score < 0.0, bad clustering" << std::endl; 
             } 
-            else if( 0 >= S_score && S_score < 0.25 )
+            else if( 0 <= S_score && S_score < 0.25 )
             {
                 std::cout << "Silhouette Score ::  " << S_score << "\t| 0.0 <= S-Score < 0.25, poor clustering" << std::endl; 
             }
